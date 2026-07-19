@@ -18,6 +18,7 @@ const el = {
   enemyHpBar: document.querySelector('#enemyHpBar'),
   battleBox: document.querySelector('#battleBox'),
   soul: document.querySelector('#soul'),
+  restartButton: document.querySelector('#restartButton'),
   arenaHint: document.querySelector('#arenaHint'),
   bullets: [document.querySelector('#bulletOne'), document.querySelector('#bulletTwo')],
   buttons: [...document.querySelectorAll('.action')],
@@ -56,6 +57,7 @@ function endGame(won) {
   setActionsDisabled(true);
   el.arenaHint.textContent = won ? 'Victory!' : 'Stay determined.';
   el.bullets.forEach((bullet) => bullet.classList.add('hidden'));
+  el.restartButton.classList.remove('hidden');
 }
 
 function defend() {
@@ -107,6 +109,32 @@ function checkHit(bullet) {
   }
 }
 
+function resetGame() {
+  state.playerHp = 20;
+  state.enemyHp = state.maxEnemyHp;
+  state.acted = false;
+  state.itemUsed = false;
+  state.sparable = false;
+  state.defending = false;
+  state.gameOver = false;
+  state.soul = { x: 50, y: 50 };
+  state.velocity = { x: 0, y: 0 };
+  el.restartButton.classList.add('hidden');
+  setActionsDisabled(false);
+  el.arenaHint.textContent = 'Choose an action, then dodge attacks.';
+  setMessage(messages.start);
+  updateBars();
+}
+
+function moveSoulToPointer(event) {
+  if (!state.defending || state.gameOver) return;
+  const box = el.battleBox.getBoundingClientRect();
+  state.soul.x = clamp(((event.clientX - box.left) / box.width) * 100, 5, 95);
+  state.soul.y = clamp(((event.clientY - box.top) / box.height) * 100, 8, 92);
+  el.soul.style.left = `${state.soul.x}%`;
+  el.soul.style.top = `${state.soul.y}%`;
+}
+
 function playerTurn(kind) {
   if (state.defending || state.gameOver) return;
   if (kind === 'fight') {
@@ -149,6 +177,11 @@ document.querySelector('#fightButton').addEventListener('click', () => playerTur
 document.querySelector('#actButton').addEventListener('click', () => playerTurn('act'));
 document.querySelector('#itemButton').addEventListener('click', () => playerTurn('item'));
 document.querySelector('#mercyButton').addEventListener('click', () => playerTurn('mercy'));
+el.restartButton.addEventListener('click', resetGame);
+el.battleBox.addEventListener('pointerdown', moveSoulToPointer);
+el.battleBox.addEventListener('pointermove', (event) => {
+  if (event.buttons || event.pointerType === 'touch') moveSoulToPointer(event);
+});
 
 const keys = { ArrowUp: [0, -1.5], ArrowDown: [0, 1.5], ArrowLeft: [-1.5, 0], ArrowRight: [1.5, 0], w: [0, -1.5], s: [0, 1.5], a: [-1.5, 0], d: [1.5, 0] };
 document.addEventListener('keydown', (event) => {

@@ -13,6 +13,7 @@ html, body { margin: 0; min-height: 100%; background: #000; color: #fff; font-fa
 
 body { display: grid; place-items: center; padding: clamp(8px, 2vw, 22px); touch-action: none; }
 
+.game-shell { width: min(760px, 100%); min-height: min(100svh, 920px); display: grid; grid-template-rows: auto minmax(190px, 1fr) auto auto auto auto; gap: 12px; }
 .game-shell { width: min(760px, 100%); min-height: min(100svh, 920px); display: grid; grid-template-rows: auto minmax(190px, 1fr) auto auto auto; gap: 12px; }
 
 .encounter, .dialog-box, .battle-box { border: 4px solid #fff; background: var(--panel); }
@@ -27,6 +28,7 @@ h1 { margin: 0; font-size: clamp(1.5rem, 5vw, 2.4rem); letter-spacing: 0.12em; }
 .enemy-hp, .player-hp { width: min(320px, 70vw); height: 14px; border: 2px solid #fff; background: #381010; }
 .enemy-hp span, .player-hp span { display: block; height: 100%; width: 100%; background: var(--green); transition: width 220ms ease; }
 
+.battle-box { position: relative; overflow: hidden; min-height: 210px; touch-action: none; user-select: none; }
 .battle-box { position: relative; overflow: hidden; min-height: 210px; }
 .soul { position: absolute; left: 50%; top: 50%; width: 24px; height: 24px; background: var(--red); transform: translate(-50%, -50%) rotate(45deg); box-shadow: 0 0 14px rgba(255,49,88,.7); z-index: 2; }
 .soul::before, .soul::after { content: ""; position: absolute; width: 24px; height: 24px; border-radius: 50%; background: var(--red); }
@@ -43,6 +45,9 @@ h1 { margin: 0; font-size: clamp(1.5rem, 5vw, 2.4rem); letter-spacing: 0.12em; }
 .action { min-height: 56px; border: 3px solid var(--orange); background: #080808; color: var(--orange); font: 700 clamp(.9rem, 3vw, 1.15rem) "Courier New", monospace; text-transform: uppercase; }
 .action:active, .action:focus-visible { color: var(--gold); border-color: var(--gold); outline: none; transform: translateY(1px); }
 .action:disabled { opacity: .5; }
+
+.restart { justify-self: center; min-height: 44px; padding: 0 22px; border: 2px solid #fff; background: #111; color: #fff; font: 700 1rem "Courier New", monospace; text-transform: uppercase; }
+.restart:active, .restart:focus-visible { color: var(--gold); border-color: var(--gold); outline: none; }
 
 .touch-controls { display: none; justify-items: center; gap: 6px; }
 .touch-controls button { width: 64px; height: 48px; border: 2px solid #fff; background: #111; color: #fff; font-size: 1.2rem; border-radius: 8px; }
