@@ -89,6 +89,7 @@ function clamp(value, minimum, maximum) {
   return Math.max(minimum, Math.min(maximum, value));
 }
 
+
 function setBattleState(nextState) {
   state.battleState = nextState;
   state.stateTime = 0;
@@ -111,6 +112,13 @@ function setBattleState(nextState) {
   state.choiceIndex = 0;
   state.pressedKeys.clear();
 }
+
+// This is the established delta-time movement and battle-box clamping mechanic.
+function updateHeartMovement(deltaSeconds) {
+  if (state.battleState !== BATTLE_STATES.ENEMY_TURN) return;
+
+  let horizontalDirection = 0;
+  let verticalDirection = 0;
 
 // This is the established delta-time movement and battle-box clamping mechanic.
 function updateHeartMovement(deltaSeconds) {
@@ -188,6 +196,120 @@ function update(deltaSeconds) {
   if (horizontalDirection !== 0 && verticalDirection !== 0) {
     horizontalDirection *= Math.SQRT1_2;
     verticalDirection *= Math.SQRT1_2;
+  }
+
+  state.heartX += horizontalDirection * CONFIG.heart.movementSpeed * deltaSeconds;
+  state.heartY += verticalDirection * CONFIG.heart.movementSpeed * deltaSeconds;
+
+  const innerLeft = CONFIG.battleBox.x + CONFIG.battleBox.lineThickness;
+  const innerTop = CONFIG.battleBox.y + CONFIG.battleBox.lineThickness;
+  const innerRight = CONFIG.battleBox.x + CONFIG.battleBox.width - CONFIG.battleBox.lineThickness;
+  const innerBottom = CONFIG.battleBox.y + CONFIG.battleBox.height - CONFIG.battleBox.lineThickness;
+  state.heartX = clamp(state.heartX, innerLeft + CONFIG.heart.width / 2, innerRight - CONFIG.heart.width / 2);
+  state.heartY = clamp(state.heartY, innerTop + CONFIG.heart.height / 2, innerBottom - CONFIG.heart.height / 2);
+}
+
+function beginEnemyTurn() {
+  setBattleState(BATTLE_STATES.ENEMY_TURN);
+  state.heartX = CONFIG.heart.startX;
+  state.heartY = CONFIG.heart.startY;
+  state.fireballs = [];
+  state.fireballSpawnTimer = 0;
+  state.invulnerabilityTimer = 0;
+  state.message = '';
+}
+
+function returnToPlayerMenu() {
+  setBattleState(BATTLE_STATES.PLAYER_MENU);
+  state.fireballs = [];
+  state.message = '* Choose an action.';
+}
+
+function endGame(message) {
+  setBattleState(BATTLE_STATES.GAME_OVER);
+  state.fireballs = [];
+  state.message = message;
+}
+
+function resetGame() {
+  state.menuIndex = 0;
+  state.message = '* A silent sentinel blocks the way.';
+  state.mercyBroken = false;
+  state.playerHp = CONFIG.status.maxHp;
+  state.enemyHp = CONFIG.enemy.maxHp;
+  state.inventory = ITEM_DETAILS.map((item) => ({ ...item }));
+  state.damageNumber = null;
+  state.meterStopped = false;
+  state.meterX = CONFIG.attackMeter.x;
+  state.heartX = CONFIG.heart.startX;
+  state.heartY = CONFIG.heart.startY;
+  setBattleState(BATTLE_STATES.INTRO);
+}
+
+function spawnFireball() {
+  const fromLeft = state.fireballs.length % 2 === 0;
+  const innerLeft = CONFIG.battleBox.x + CONFIG.battleBox.lineThickness;
+  const innerRight = CONFIG.battleBox.x + CONFIG.battleBox.width - CONFIG.battleBox.lineThickness;
+  const availableHeight = CONFIG.battleBox.height - CONFIG.battleBox.lineThickness * 2 - CONFIG.fireball.radius * 2;
+  const sequence = (state.fireballs.length * 0.37) % 1;
+  state.fireballs.push({
+    x: fromLeft ? innerLeft - CONFIG.fireball.radius : innerRight + CONFIG.fireball.radius,
+    baseY: CONFIG.battleBox.y + CONFIG.battleBox.lineThickness + CONFIG.fireball.radius + availableHeight * sequence,
+    y: 0,
+    direction: fromLeft ? 1 : -1,
+    age: 0,
+  });
+}
+
+function fireballHitsHeart(fireball) {
+  const closestX = clamp(fireball.x, state.heartX - CONFIG.heart.width / 2, state.heartX + CONFIG.heart.width / 2);
+  const closestY = clamp(fireball.y, state.heartY - CONFIG.heart.height / 2, state.heartY + CONFIG.heart.height / 2);
+  return Math.hypot(fireball.x - closestX, fireball.y - closestY) <= CONFIG.fireball.radius;
+}
+
+function updateFireballs(deltaSeconds) {
+  state.fireballSpawnTimer -= deltaSeconds;
+  if (state.fireballSpawnTimer <= 0) {
+    spawnFireball();
+    state.fireballSpawnTimer = CONFIG.fireball.spawnInterval;
+  }
+  state.invulnerabilityTimer = Math.max(0, state.invulnerabilityTimer - deltaSeconds);
+  const innerLeft = CONFIG.battleBox.x + CONFIG.battleBox.lineThickness;
+  const innerRight = CONFIG.battleBox.x + CONFIG.battleBox.width - CONFIG.battleBox.lineThickness;
+
+  state.fireballs.forEach((fireball) => {
+    fireball.age += deltaSeconds;
+    fireball.x += fireball.direction * CONFIG.fireball.speed * deltaSeconds;
+    fireball.y = fireball.baseY + Math.sin(fireball.age * CONFIG.fireball.waveFrequency) * CONFIG.fireball.waveAmplitude;
+    if (state.invulnerabilityTimer === 0 && fireballHitsHeart(fireball)) {
+      state.playerHp = clamp(state.playerHp - CONFIG.fireball.damage, 0, CONFIG.status.maxHp);
+      state.invulnerabilityTimer = CONFIG.fireball.invulnerabilityDuration;
+      if (state.playerHp === 0) endGame('* You were defeated. Press Z or Enter to restart.');
+    }
+  });
+  state.fireballs = state.fireballs.filter((fireball) => fireball.x > innerLeft - CONFIG.fireball.radius * 2 && fireball.x < innerRight + CONFIG.fireball.radius * 2);
+}
+
+function update(deltaSeconds) {
+  state.stateTime += deltaSeconds;
+  if (state.damageNumber) {
+    state.damageNumber.time -= deltaSeconds;
+    if (state.damageNumber.time <= 0) state.damageNumber = null;
+  }
+
+  if (state.battleState === BATTLE_STATES.INTRO) {
+    if (state.stateTime >= CONFIG.intro.breakStart) state.mercyBroken = true;
+    if (state.stateTime >= CONFIG.intro.duration) returnToPlayerMenu();
+  } else if (state.battleState === BATTLE_STATES.FIGHT_MENU && !state.meterStopped) {
+    state.meterX += CONFIG.attackMeter.speed * deltaSeconds;
+    if (state.meterX >= CONFIG.attackMeter.x + CONFIG.attackMeter.width) stopFightMeter();
+  } else if (state.actionTimer > 0) {
+    state.actionTimer -= deltaSeconds;
+    if (state.actionTimer <= 0 && state.battleState !== BATTLE_STATES.GAME_OVER) beginEnemyTurn();
+  } else if (state.battleState === BATTLE_STATES.ENEMY_TURN) {
+    updateHeartMovement(deltaSeconds);
+    updateFireballs(deltaSeconds);
+    if (state.battleState === BATTLE_STATES.ENEMY_TURN && state.stateTime >= CONFIG.fireball.attackDuration) returnToPlayerMenu();
   }
 
   state.heartX += horizontalDirection * CONFIG.heart.movementSpeed * deltaSeconds;
@@ -677,6 +799,28 @@ function initializeGame() {
   canvas = document.querySelector('#gameCanvas');
   if (!canvas) {
     console.error('Unable to start: canvas#gameCanvas was not found.');
+    return;
+  }
+
+  context = canvas.getContext('2d');
+  if (!context) {
+    canvas.textContent = 'Unable to start: this browser does not support a 2D canvas.';
+    return;
+  }
+
+  canvas.width = CONFIG.canvas.width;
+  canvas.height = CONFIG.canvas.height;
+  state.previousTime = performance.now();
+  setUpInput();
+  draw();
+  requestAnimationFrame(gameLoop);
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initializeGame, { once: true });
+} else {
+  initializeGame();
+}
     return;
   }
 
