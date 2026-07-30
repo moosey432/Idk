@@ -1,217 +1,187 @@
+// Every value intended for adjustment is kept in this configuration object.
+const CONFIG = Object.freeze({
+  canvas: {
+    width: 640,
+    height: 480,
+    backgroundColor: '#000000',
+  },
+  battleBox: {
+    x: 32,
+    y: 250,
+    width: 576,
+    height: 140,
+    lineThickness: 4,
+    lineColor: '#ffffff',
+  },
+  heart: {
+    startX: 320,
+    startY: 320,
+    width: 16,
+    height: 14,
+    color: '#ff0000',
+    movementSpeed: 120,
+  },
+  debug: {
+    enabled: true,
+    x: 12,
+    y: 18,
+    lineHeight: 16,
+    fontSize: 12,
+    fontFamily: 'monospace',
+    color: '#00ff00',
+    coordinateDecimals: 1,
+    fpsSmoothing: 0.1,
+  },
+  timing: {
+    maximumDeltaSeconds: 0.1,
+    millisecondsPerSecond: 1000,
+  },
+});
+
+const canvas = document.querySelector('#gameCanvas');
+const context = canvas.getContext('2d');
+
+canvas.width = CONFIG.canvas.width;
+canvas.height = CONFIG.canvas.height;
+
 const state = {
-  playerHp: 20,
-  enemyHp: 30,
-  maxEnemyHp: 30,
-  acted: false,
-  itemUsed: false,
-  sparable: false,
-  defending: false,
-  gameOver: false,
-  soul: { x: 50, y: 50 },
-  velocity: { x: 0, y: 0 },
+  heartX: CONFIG.heart.startX,
+  heartY: CONFIG.heart.startY,
+  pressedKeys: new Set(),
+  previousTime: performance.now(),
+  fps: 0,
 };
 
-const el = {
-  message: document.querySelector('#message'),
-  playerHp: document.querySelector('#playerHp'),
-  playerHpBar: document.querySelector('#playerHpBar'),
-  enemyHpBar: document.querySelector('#enemyHpBar'),
-  battleBox: document.querySelector('#battleBox'),
-  soul: document.querySelector('#soul'),
-  restartButton: document.querySelector('#restartButton'),
-  arenaHint: document.querySelector('#arenaHint'),
-  bullets: [document.querySelector('#bulletOne'), document.querySelector('#bulletTwo')],
-  buttons: [...document.querySelectorAll('.action')],
-};
-
-const messages = {
-  start: '* A tiny snow monster blocks the path.',
-  fight: '* You swing bravely. Frostby looks more impressed than hurt.',
-  act: '* You tell Frostby a warm joke. It starts to melt with laughter.',
-  item: '* You ate the pocket pie. Your HP was restored.',
-  mercyNo: '* Frostby is not ready to be spared.',
-  mercyYes: '* You spared Frostby. It waves goodbye with chilly little hands.',
-};
-
-function setMessage(text) { el.message.textContent = text; }
-function clamp(value, min, max) { return Math.max(min, Math.min(max, value)); }
-
-function updateBars() {
-  el.playerHp.textContent = state.playerHp;
-  el.playerHpBar.style.width = `${(state.playerHp / 20) * 100}%`;
-  el.enemyHpBar.style.width = `${(state.enemyHp / state.maxEnemyHp) * 100}%`;
+function clamp(value, minimum, maximum) {
+  return Math.max(minimum, Math.min(maximum, value));
 }
 
-function moveSoul() {
-  state.soul.x = clamp(state.soul.x + state.velocity.x, 5, 95);
-  state.soul.y = clamp(state.soul.y + state.velocity.y, 8, 92);
-  el.soul.style.left = `${state.soul.x}%`;
-  el.soul.style.top = `${state.soul.y}%`;
-  requestAnimationFrame(moveSoul);
-}
+function update(deltaSeconds) {
+  let horizontalDirection = 0;
+  let verticalDirection = 0;
 
-function setActionsDisabled(disabled) { el.buttons.forEach((button) => { button.disabled = disabled; }); }
+  if (state.pressedKeys.has('ArrowLeft')) horizontalDirection -= 1;
+  if (state.pressedKeys.has('ArrowRight')) horizontalDirection += 1;
+  if (state.pressedKeys.has('ArrowUp')) verticalDirection -= 1;
+  if (state.pressedKeys.has('ArrowDown')) verticalDirection += 1;
 
-function endGame(won) {
-  state.gameOver = true;
-  setActionsDisabled(true);
-  el.arenaHint.textContent = won ? 'Victory!' : 'Stay determined.';
-  el.bullets.forEach((bullet) => bullet.classList.add('hidden'));
-  el.restartButton.classList.remove('hidden');
-}
-
-function defend() {
-  if (state.gameOver) return;
-  state.defending = true;
-  setActionsDisabled(true);
-  el.arenaHint.textContent = 'Dodge the blue snowballs!';
-  const box = el.battleBox.getBoundingClientRect();
-  const duration = 3600;
-  const start = performance.now();
-  el.bullets.forEach((bullet, index) => bullet.classList.remove('hidden'));
-
-  function animate(time) {
-    const progress = (time - start) / duration;
-    el.bullets.forEach((bullet, index) => {
-      const wave = Math.sin(progress * Math.PI * 6 + index * 1.8);
-      const x = index === 0 ? progress * box.width : box.width - progress * box.width;
-      const y = box.height * (0.34 + wave * 0.25 + index * 0.16);
-      bullet.style.left = `${x}px`;
-      bullet.style.top = `${y}px`;
-      checkHit(bullet);
-    });
-
-    if (progress < 1 && !state.gameOver) {
-      requestAnimationFrame(animate);
-    } else if (!state.gameOver) {
-      state.defending = false;
-      setActionsDisabled(false);
-      el.arenaHint.textContent = state.sparable ? 'Frostby can be spared.' : 'Choose an action.';
-      el.bullets.forEach((bullet) => bullet.classList.add('hidden'));
-    }
+  if (horizontalDirection !== 0 && verticalDirection !== 0) {
+    const diagonalScale = Math.SQRT1_2;
+    horizontalDirection *= diagonalScale;
+    verticalDirection *= diagonalScale;
   }
-  requestAnimationFrame(animate);
+
+  state.heartX += horizontalDirection * CONFIG.heart.movementSpeed * deltaSeconds;
+  state.heartY += verticalDirection * CONFIG.heart.movementSpeed * deltaSeconds;
+
+  const innerLeft = CONFIG.battleBox.x + CONFIG.battleBox.lineThickness;
+  const innerTop = CONFIG.battleBox.y + CONFIG.battleBox.lineThickness;
+  const innerRight = CONFIG.battleBox.x + CONFIG.battleBox.width - CONFIG.battleBox.lineThickness;
+  const innerBottom = CONFIG.battleBox.y + CONFIG.battleBox.height - CONFIG.battleBox.lineThickness;
+
+  state.heartX = clamp(
+    state.heartX,
+    innerLeft + CONFIG.heart.width / 2,
+    innerRight - CONFIG.heart.width / 2,
+  );
+  state.heartY = clamp(
+    state.heartY,
+    innerTop + CONFIG.heart.height / 2,
+    innerBottom - CONFIG.heart.height / 2,
+  );
 }
 
-function checkHit(bullet) {
-  const soul = el.soul.getBoundingClientRect();
-  const snow = bullet.getBoundingClientRect();
-  const overlap = !(soul.right < snow.left || soul.left > snow.right || soul.bottom < snow.top || soul.top > snow.bottom);
-  if (overlap && !bullet.dataset.hit) {
-    bullet.dataset.hit = 'true';
-    setTimeout(() => { bullet.dataset.hit = ''; }, 500);
-    state.playerHp = clamp(state.playerHp - 2, 0, 20);
-    updateBars();
-    if (state.playerHp <= 0) {
-      setMessage('* You ran out of HP. Game over.');
-      endGame(false);
-    }
-  }
+function drawHeart() {
+  const left = state.heartX - CONFIG.heart.width / 2;
+  const top = state.heartY - CONFIG.heart.height / 2;
+  const unitX = CONFIG.heart.width / 4;
+  const unitY = CONFIG.heart.height / 4;
+
+  context.fillStyle = CONFIG.heart.color;
+  context.beginPath();
+  context.moveTo(state.heartX, top + unitY);
+  context.bezierCurveTo(left + unitX, top - unitY, left, top + unitY, left, top + unitY * 2);
+  context.bezierCurveTo(left, top + unitY * 3, state.heartX, top + CONFIG.heart.height, state.heartX, top + CONFIG.heart.height);
+  context.bezierCurveTo(state.heartX, top + CONFIG.heart.height, left + CONFIG.heart.width, top + unitY * 3, left + CONFIG.heart.width, top + unitY * 2);
+  context.bezierCurveTo(left + CONFIG.heart.width, top + unitY, left + unitX * 3, top - unitY, state.heartX, top + unitY);
+  context.fill();
 }
 
-function resetGame() {
-  state.playerHp = 20;
-  state.enemyHp = state.maxEnemyHp;
-  state.acted = false;
-  state.itemUsed = false;
-  state.sparable = false;
-  state.defending = false;
-  state.gameOver = false;
-  state.soul = { x: 50, y: 50 };
-  state.velocity = { x: 0, y: 0 };
-  el.restartButton.classList.add('hidden');
-  setActionsDisabled(false);
-  el.arenaHint.textContent = 'Choose an action, then dodge attacks.';
-  setMessage(messages.start);
-  updateBars();
+function drawBattleBox() {
+  const halfLine = CONFIG.battleBox.lineThickness / 2;
+
+  context.strokeStyle = CONFIG.battleBox.lineColor;
+  context.lineWidth = CONFIG.battleBox.lineThickness;
+  context.strokeRect(
+    CONFIG.battleBox.x + halfLine,
+    CONFIG.battleBox.y + halfLine,
+    CONFIG.battleBox.width - CONFIG.battleBox.lineThickness,
+    CONFIG.battleBox.height - CONFIG.battleBox.lineThickness,
+  );
 }
 
-function moveSoulToPointer(event) {
-  if (!state.defending || state.gameOver) return;
-  const box = el.battleBox.getBoundingClientRect();
-  state.soul.x = clamp(((event.clientX - box.left) / box.width) * 100, 5, 95);
-  state.soul.y = clamp(((event.clientY - box.top) / box.height) * 100, 8, 92);
-  el.soul.style.left = `${state.soul.x}%`;
-  el.soul.style.top = `${state.soul.y}%`;
+function drawDebugInformation() {
+  if (!CONFIG.debug.enabled) return;
+
+  const lines = [
+    `Heart X: ${state.heartX.toFixed(CONFIG.debug.coordinateDecimals)}`,
+    `Heart Y: ${state.heartY.toFixed(CONFIG.debug.coordinateDecimals)}`,
+    `Battle box: ${CONFIG.battleBox.width} x ${CONFIG.battleBox.height}`,
+    `FPS: ${Math.round(state.fps)}`,
+    `Heart speed: ${CONFIG.heart.movementSpeed} px/s`,
+  ];
+
+  context.fillStyle = CONFIG.debug.color;
+  context.font = `${CONFIG.debug.fontSize}px ${CONFIG.debug.fontFamily}`;
+  context.textBaseline = 'alphabetic';
+  lines.forEach((line, index) => {
+    context.fillText(line, CONFIG.debug.x, CONFIG.debug.y + index * CONFIG.debug.lineHeight);
+  });
 }
 
-function playerTurn(kind) {
-  if (state.defending || state.gameOver) return;
-  if (kind === 'fight') {
-    state.enemyHp = clamp(state.enemyHp - 8, 0, state.maxEnemyHp);
-    setMessage(messages.fight);
-  }
-  if (kind === 'act') {
-    state.acted = true;
-    state.sparable = true;
-    setMessage(messages.act);
-  }
-  if (kind === 'item') {
-    if (state.itemUsed) setMessage('* The pocket is empty.');
-    else {
-      state.itemUsed = true;
-      state.playerHp = clamp(state.playerHp + 8, 0, 20);
-      setMessage(messages.item);
-    }
-  }
-  if (kind === 'mercy') {
-    if (state.sparable || state.enemyHp <= 8) {
-      setMessage(messages.mercyYes);
-      updateBars();
-      endGame(true);
-      return;
-    }
-    setMessage(messages.mercyNo);
-  }
-  if (state.enemyHp <= 0) {
-    setMessage('* Frostby tumbles into a harmless pile of snow. You won!');
-    updateBars();
-    endGame(true);
-    return;
-  }
-  updateBars();
-  setTimeout(defend, 650);
+function draw() {
+  context.fillStyle = CONFIG.canvas.backgroundColor;
+  context.fillRect(0, 0, CONFIG.canvas.width, CONFIG.canvas.height);
+  drawBattleBox();
+  drawHeart();
+  drawDebugInformation();
 }
 
-document.querySelector('#fightButton').addEventListener('click', () => playerTurn('fight'));
-document.querySelector('#actButton').addEventListener('click', () => playerTurn('act'));
-document.querySelector('#itemButton').addEventListener('click', () => playerTurn('item'));
-document.querySelector('#mercyButton').addEventListener('click', () => playerTurn('mercy'));
-el.restartButton.addEventListener('click', resetGame);
-el.battleBox.addEventListener('pointerdown', moveSoulToPointer);
-el.battleBox.addEventListener('pointermove', (event) => {
-  if (event.buttons || event.pointerType === 'touch') moveSoulToPointer(event);
-});
+function gameLoop(currentTime) {
+  const elapsedMilliseconds = currentTime - state.previousTime;
+  const deltaSeconds = Math.min(
+    elapsedMilliseconds / CONFIG.timing.millisecondsPerSecond,
+    CONFIG.timing.maximumDeltaSeconds,
+  );
 
-const keys = { ArrowUp: [0, -1.5], ArrowDown: [0, 1.5], ArrowLeft: [-1.5, 0], ArrowRight: [1.5, 0], w: [0, -1.5], s: [0, 1.5], a: [-1.5, 0], d: [1.5, 0] };
-document.addEventListener('keydown', (event) => {
-  if (!keys[event.key]) return;
+  state.previousTime = currentTime;
+  if (deltaSeconds > 0) {
+    const instantaneousFps = 1 / deltaSeconds;
+    state.fps += (instantaneousFps - state.fps) * CONFIG.debug.fpsSmoothing;
+  }
+
+  update(deltaSeconds);
+  draw();
+  requestAnimationFrame(gameLoop);
+}
+
+const arrowKeys = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
+
+window.addEventListener('keydown', (event) => {
+  if (!arrowKeys.has(event.key)) return;
   event.preventDefault();
-  const [x, y] = keys[event.key];
-  state.velocity.x = x;
-  state.velocity.y = y;
-});
-document.addEventListener('keyup', (event) => {
-  if (!keys[event.key]) return;
-  state.velocity.x = 0;
-  state.velocity.y = 0;
+  state.pressedKeys.add(event.key);
 });
 
-document.querySelectorAll('[data-dir]').forEach((button) => {
-  const vectors = { up: [0, -1.2], down: [0, 1.2], left: [-1.2, 0], right: [1.2, 0] };
-  const start = (event) => {
-    event.preventDefault();
-    const [x, y] = vectors[button.dataset.dir];
-    state.velocity.x = x;
-    state.velocity.y = y;
-  };
-  const stop = () => { state.velocity.x = 0; state.velocity.y = 0; };
-  button.addEventListener('pointerdown', start);
-  button.addEventListener('pointerup', stop);
-  button.addEventListener('pointercancel', stop);
-  button.addEventListener('pointerleave', stop);
+window.addEventListener('keyup', (event) => {
+  if (!arrowKeys.has(event.key)) return;
+  event.preventDefault();
+  state.pressedKeys.delete(event.key);
 });
 
-updateBars();
-moveSoul();
-setMessage(messages.start);
+window.addEventListener('blur', () => {
+  state.pressedKeys.clear();
+});
+
+draw();
+requestAnimationFrame(gameLoop);
