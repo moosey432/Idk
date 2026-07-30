@@ -1,64 +1,17 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Little Soul Battle</title>
-  <link rel="stylesheet" href="styles.css" />
-</head>
-<body>
-  <main class="game-shell" aria-label="Little Soul Battle game">
-    <section class="encounter" aria-live="polite">
-      <div class="enemy-card">
-        <div class="enemy-sprite" id="enemySprite" aria-hidden="true">
-          <span class="horn left"></span>
-          <span class="horn right"></span>
-          <span class="face">◕‿◕</span>
-        </div>
-        <h1 id="enemyName">FROSTBY</h1>
-        <div class="enemy-hp" aria-label="Enemy health">
-          <span id="enemyHpBar"></span>
-        </div>
-      </div>
-    </section>
-
-    <section class="battle-box" id="battleBox" aria-label="Battle arena">
-      <div class="soul" id="soul" aria-label="Player soul"></div>
-      <div class="bullet hidden" id="bulletOne"></div>
-      <div class="bullet hidden" id="bulletTwo"></div>
-      <p class="arena-hint" id="arenaHint">Choose an action, then dodge attacks.</p>
-      <p class="arena-hint" id="arenaHint">Choose an action.</p>
-    </section>
-
-    <section class="dialog-box" aria-live="polite">
-      <p id="message">* A tiny snow monster blocks the path.</p>
-    </section>
-
-    <section class="status-row" aria-label="Player status">
-      <span>LV 1</span>
-      <span>HP <strong id="playerHp">20</strong>/20</span>
-      <div class="player-hp" aria-hidden="true"><span id="playerHpBar"></span></div>
-    </section>
-
-    <nav class="actions" aria-label="Battle actions">
-      <button class="action fight" id="fightButton">⚔ Fight</button>
-      <button class="action act" id="actButton">☄ Act</button>
-      <button class="action item" id="itemButton">✦ Item</button>
-      <button class="action mercy" id="mercyButton">♡ Mercy</button>
-    </nav>
-
-    <button class="restart hidden" id="restartButton">Play again</button>
-
-    <section class="touch-controls" aria-label="Touch movement controls">
-      <button data-dir="up" aria-label="Move up">▲</button>
-      <div>
-        <button data-dir="left" aria-label="Move left">◀</button>
-        <button data-dir="down" aria-label="Move down">▼</button>
-        <button data-dir="right" aria-label="Move right">▶</button>
-      </div>
-    </section>
-  </main>
-
-  <script src="game.js"></script>
-</body>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Battle Mechanics Practice</title>
+    <link rel="stylesheet" href="./styles.css">
+    <script type="module" src="./game.js"></script>
+  </head>
+  <body>
+    <main>
+      <canvas id="gameCanvas" width="640" height="480" aria-label="Battle mechanics practice area">
+        Your browser does not support the HTML canvas element.
+      </canvas>
+    </main>
+  </body>
 </html>
